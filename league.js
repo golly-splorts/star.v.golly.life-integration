@@ -4,6 +4,7 @@
 
     baseApiUrl : getBaseApiUrl(),
     baseUIUrl : getBaseUIUrl(),
+    daysPerSeason: 11,
 
     loadingElem : null,
     season : null,
@@ -149,7 +150,6 @@
       const currentSeason = currentSeason0 + 1;
 
       const elapsed = this.modeApiResult.elapsed;
-      const daysPerSeason = 11;
 
       // 1-indexed
       let days = [];
@@ -174,10 +174,10 @@
 
       } else { // Pre-season, post-season, or a past season is selected
 
-        for (let i = 1; i <= daysPerSeason; i++) {
+        for (let i = 1; i <= this.daysPerSeason; i++) {
           days.push(i);
         }
-        defaultDayValue = daysPerSeason;
+        defaultDayValue = this.daysPerSeason;
       }
 
 
@@ -256,20 +256,8 @@
       this.clearStandings();
       this.loading();
 
-      const leagueStandingsContainer = document.getElementById('league-standings-container');
-      const mode = this.modeApiResult.mode;
-      const currentSeason = this.modeApiResult.season + 1;
-      const showGlColumn = (mode >= 10 && mode < 20 && season == currentSeason);
-
-      if (showGlColumn) {
-          leagueStandingsContainer.classList.remove('hide-gl-column');
-      } else {
-          leagueStandingsContainer.classList.add('hide-gl-column');
-      }
-
       let season0 = season - 1;
       let day0 = day - 1;
-      const dps = 11; // days per season
 
       let recordsUrl = this.baseApiUrl + '/standings/' + season0 + '/' + day0;
       fetch(recordsUrl)
@@ -280,7 +268,7 @@
         const currentSeason0 = this.modeApiResult.season;
         const selectedSeason0 = season - 1;
 
-        const viewingLastDay = (day == dps);
+        const viewingLastDay = (day == this.daysPerSeason);
         const seasonIsOver = (selectedSeason0 < currentSeason0) || (selectedSeason0 === currentSeason0 && mode >= 20);
 
         if (seasonIsOver && viewingLastDay) {
@@ -309,6 +297,18 @@
     },
 
     populateStandings: function(standingsApiResult, seedsApiResult) {
+        const mode = this.modeApiResult.mode;
+        const showGamesLeft = mode >= 10 && mode < 20;
+
+        const gl_headers = document.getElementsByClassName('games-left-col');
+        for (let i = 0; i < gl_headers.length; i++) {
+            if (showGamesLeft) {
+                gl_headers[i].style.display = '';
+            } else {
+                gl_headers[i].style.display = 'none';
+            }
+        }
+
         // Hide loading message and make league standings container visible
         this.loadingElem.classList.add('invisible');
         var leagueStandingsElem = document.getElementById('league-standings-container');
@@ -464,7 +464,6 @@
             } else {
                 // If seeds are not final, calculate prefixes and then sort
                 teamPrefixes = {};
-                const dps = 11;
                 const day0 = this.day - 1;
                 const divisionLeaderForPrefix = teamStandingsItems[0];
 
@@ -477,22 +476,22 @@
                         let is_div_clinched = false;
                         if (teamStandingsItems.length > 1) {
                             const second_place_losses = teamStandingsItems[1].teamWinLoss[1];
-                            const magic = (dps + 1) - our_wins - second_place_losses;
+                            const magic = (this.daysPerSeason + 1) - our_wins - second_place_losses;
                             if (magic <= 0) {
                                 is_div_clinched = true;
                             }
                         }
-                        if (day0 === dps - 1) { // Last day of season
+                        if (day0 === this.daysPerSeason - 1) { // Last day of season
                             is_div_clinched = true;
                         }
                         if (is_div_clinched) {
                             prefix = 'x-';
                         }
                     } else { // Not division leader
-                        const elim_val = (dps + 1) - divisionLeaderForPrefix.teamWinLoss[0] - our_losses;
+                        const elim_val = (this.daysPerSeason + 1) - divisionLeaderForPrefix.teamWinLoss[0] - our_losses;
                         let wc_elim_val = Infinity;
                         if (wc_standings.length > 1) {
-                            wc_elim_val = (dps + 1) - wc_standings[1].teamWinLoss[0] - our_losses;
+                            wc_elim_val = (this.daysPerSeason + 1) - wc_standings[1].teamWinLoss[0] - our_losses;
                         }
                         const is_eliminated = (elim_val <= 0 && (wc_elim_val <= 0 || wc_standings.length < 2));
                         if (is_eliminated) {
@@ -504,7 +503,7 @@
                         let is_playoff_clinched = false;
                         if (overall_league_standings.length > 4) {
                             const challenger = overall_league_standings[4];
-                            const playoff_clinch_magic = (dps + 1) - our_wins - challenger.teamWinLoss[1];
+                            const playoff_clinch_magic = (this.daysPerSeason + 1) - our_wins - challenger.teamWinLoss[1];
                             if (playoff_clinch_magic <= 0) {
                                 is_playoff_clinched = true;
                             }
@@ -532,7 +531,6 @@
             }
 
             const divisionLeader = teamStandingsItems[0];
-            const dps = 11;
             const day0 = this.day - 1;
 
             for (var iS = 0; iS < teamStandingsItems.length; iS++) {
@@ -614,7 +612,16 @@
               tdPct.textContent = pct.toFixed(2);
               tr.appendChild(tdPct);
 
-              // Col 5: GB
+              // Col 5: Games Left
+              if (showGamesLeft) {
+                var tdGl = document.createElement('td');
+                tdGl.classList.add('text-center', 'games-left-col');
+                const games_played = our_wins + our_losses;
+                tdGl.textContent = this.daysPerSeason - games_played;
+                tr.appendChild(tdGl);
+              }
+
+              // Col 6: GB
               var tdGb = document.createElement('td');
               tdGb.classList.add('text-center'); // Align right
               if (iS === 0) {
@@ -627,24 +634,18 @@
               }
               tr.appendChild(tdGb);
 
-              // Col 6: GL
-              var tdGl = document.createElement('td');
-              tdGl.classList.add('text-center', 'gl-col'); // Align right
-              tdGl.textContent = dps - (our_wins + our_losses);
-              tr.appendChild(tdGl);
-
               // Col 7: Elim #
               var tdElim = document.createElement('td');
               tdElim.classList.add('text-center'); // Align right
               if (iS === 0) {
                   tdElim.textContent = '-';
               } else {
-                  const elim_val = (dps + 1) - divisionLeader.teamWinLoss[0] - our_losses;
+                  const elim_val = (this.daysPerSeason + 1) - divisionLeader.teamWinLoss[0] - our_losses;
                   tdElim.textContent = elim_val > 0 ? elim_val : '0';
               }
               tr.appendChild(tdElim);
 
-              // Col 7: WC Elim #
+              // Col 8: WC Elim #
               var tdWcElim = document.createElement('td');
               tdWcElim.classList.add('text-center'); // Align right
               if (iS === 0) {
@@ -652,7 +653,7 @@
               } else {
                 let wc_elim_val_str = '-';
                 if (wc_standings.length > 1) {
-                    const wc_elim_val = (dps + 1) - wc_standings[1].teamWinLoss[0] - our_losses;
+                    const wc_elim_val = (this.daysPerSeason + 1) - wc_standings[1].teamWinLoss[0] - our_losses;
                     if (wc_elim_val > 0) {
                       wc_elim_val_str = wc_elim_val;
                     } else {
